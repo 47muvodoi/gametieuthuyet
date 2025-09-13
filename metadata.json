@@ -1,0 +1,5 @@
+{
+  "name": "Adventure Creator",
+  "description": "A character and world creation screen for a text-based adventure game.",
+  "requestFramePermissions": []
+}
