@@ -691,3 +691,10 @@ Khô khan, khít chặt (trước màn dạo đầu hoặc cưỡng hiếp).
 Rỉ ướt, chảy dọc khe, bám lên đùi.
 Ướt đẫm, nước nhễu nhão, nhỏ giọt xuống sàn.
 `;
+
+export const choiceGenerationRule = `
+✦ QUY TẮC TẠO LỰA CHỌN (TỐI QUAN TRỌNG):
+- **BẮT BUỘC CÓ LỰA CHỌN:** Sau mỗi đoạn truyện, bạn BẮT BUỘC phải cung cấp một mảng \`choices\` chứa ít nhất 2 và tối đa 4 lựa chọn hợp lý, đa dạng và hấp dẫn cho người chơi.
+- **KHÔNG BAO GIỜ ĐỂ TRỐNG:** Mảng \`choices\` KHÔNG BAO GIỜ được để trống hoặc thiếu. Đây là yêu cầu BẮT BUỘC để trò chơi có thể tiếp tục. Việc không cung cấp lựa chọn sẽ phá hỏng trò chơi.
+- **CHẤT LƯỢNG LỰA CHỌN:** Mỗi lựa chọn phải rõ ràng, có ý nghĩa và dẫn đến những kết quả tiềm năng khác nhau, được mô tả trong \`successReward\` và \`failurePenalty\`.
+`;

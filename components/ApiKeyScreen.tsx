@@ -16,16 +16,16 @@ export const ApiKeyScreen = ({ onApiKeySubmit }: ApiKeyScreenProps) => {
 
   return (
     <main className="api-key-screen">
-      <h1>Nhập API Key Gemini</h1>
-      <p>Để bắt đầu cuộc phiêu lưu, vui lòng nhập API Key Google Gemini của bạn. API key sẽ chỉ được lưu trong phiên truy cập này.</p>
+      <h1>Vui Lòng nhập API Key sever</h1>
+      <p>Để bắt đầu cuộc phiêu lưu, vui lòng nhập API Key của máy chủ. API key sẽ chỉ được lưu trong phiên truy cập này.</p>
       <form onSubmit={handleSubmit} className="api-key-form">
         <input
           type="password"
           className="input"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Nhập API Key của bạn tại đây"
-          aria-label="Gemini API Key"
+          placeholder="Nhập API Key máy chủ của bạn tại đây"
+          aria-label="Server API Key"
           required
         />
         <button type="submit" className="btn btn-primary" disabled={!apiKey.trim()}>

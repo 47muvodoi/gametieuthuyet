@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type, Chat } from "@google/genai";
-import { PlayerSidebar } from './PlayerSidebar';
 import { InventoryModal } from './InventoryModal';
 import { RelativesModal } from './RelativesModal';
 import { CharacterModal } from './CharacterModal';
@@ -9,7 +8,7 @@ import { NpcTooltip } from './NpcTooltip';
 import { StoryHistory } from './StoryHistory';
 import { ChoicesPanel } from './ChoicesPanel';
 import { SAVE_GAME_KEY } from '../constants';
-import { coreRules, inventoryRule, familyRule, formattingRules, pregnancyRule, nsfwRules, memoryAndConsistencyRule } from './prompts';
+import { coreRules, inventoryRule, familyRule, formattingRules, pregnancyRule, nsfwRules, memoryAndConsistencyRule, choiceGenerationRule } from './prompts';
 import type { PlayerState, ObjectState, StoryTurn, NpcTooltipState, NpcDetails } from '../types';
 
 const API_KEY_SESSION_STORAGE_KEY = 'gemini-api-key';
@@ -28,7 +27,6 @@ const MobileMenuModal = ({ isOpen, onClose, onOpenCharacter, onOpenInventory, on
 
     const handleOpen = (openFunc: () => void) => {
         onClose();
-        // A small delay to allow the menu modal to close before the next one opens, preventing visual glitches.
         setTimeout(openFunc, 200);
     };
 
@@ -63,7 +61,6 @@ interface ChoicesModalProps {
 const ChoicesModal = ({ isOpen, onClose, lastTurn, customChoice, onCustomChoiceChange, onCustomChoiceSubmit, onChoiceClick }: ChoicesModalProps) => {
     if (!isOpen) return null;
 
-    // These wrappers ensure the modal closes after a choice is submitted.
     const handleFormSubmit = (e: React.FormEvent) => {
         onCustomChoiceSubmit(e);
         onClose();
@@ -118,29 +115,28 @@ export const AdventureScreen = ({ initialPlayerState, objects, initialHistory }:
     const [saveMessage, setSaveMessage] = useState('');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false);
+    const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
+    const [isGeneratingBackground, setIsGeneratingBackground] = useState(false);
 
-    // Refs for scrolling logic
+    // Refs
     const endOfHistoryRef = useRef<HTMLDivElement>(null);
     const turnRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+    const genAI = useRef<GoogleGenAI | null>(null);
 
     useEffect(() => {
         const lastTurn = history.length > 0 ? history[history.length - 1] : null;
 
-        // After a choice is made and we are waiting for the AI, scroll to the outcome of that choice.
         if (loading && lastTurn?.selectedChoiceText) {
             const completedTurnNode = turnRefs.current.get(lastTurn.id);
             completedTurnNode?.scrollIntoView({ behavior: 'smooth', block: 'end' });
         } else {
-            // Otherwise (e.g., a new turn has loaded), scroll to the very bottom to show the new choices.
             endOfHistoryRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
     }, [history, loading]);
     
-    // Global click handler to unpin tooltips
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            // Close NPC tooltip
             if (isNpcTooltipPinned) {
                 const tooltipEl = document.querySelector('.tooltip');
                 if (tooltipEl && !tooltipEl.contains(target) && !target.closest('.npc-name')) {
@@ -155,8 +151,38 @@ export const AdventureScreen = ({ initialPlayerState, objects, initialHistory }:
         };
     }, [isNpcTooltipPinned]);
 
+    const generateBackgroundImage = async (storyText: string) => {
+        if (isGeneratingBackground || !genAI.current) return;
+        setIsGeneratingBackground(true);
 
-    // Initialize chat
+        try {
+            const summaryPrompt = `Based on the following story, create a short, descriptive prompt for an image generation model. The prompt should capture the atmosphere and setting. The style should be 'dark fantasy, cinematic, atmospheric painting'. Story: "${storyText.substring(0, 300)}"`;
+            
+            const summaryResponse = await genAI.current.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: summaryPrompt,
+            });
+            const imagePrompt = summaryResponse.text;
+            
+            const imageResponse = await genAI.current.models.generateImages({
+                model: 'imagen-4.0-generate-001',
+                prompt: imagePrompt,
+                config: { numberOfImages: 1 },
+            });
+            
+            if (imageResponse.generatedImages && imageResponse.generatedImages.length > 0) {
+                const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
+                const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
+                setBackgroundImageUrl(imageUrl);
+            }
+        } catch (e) {
+            console.error("Failed to generate background image:", e);
+        } finally {
+            setIsGeneratingBackground(false);
+        }
+    };
+
+
     useEffect(() => {
         const initializeChat = async () => {
              const apiKey = sessionStorage.getItem(API_KEY_SESSION_STORAGE_KEY);
@@ -170,6 +196,7 @@ export const AdventureScreen = ({ initialPlayerState, objects, initialHistory }:
                 ? `
 ${memoryAndConsistencyRule}
 ${coreRules}
+${choiceGenerationRule}
 ${inventoryRule}
 ${familyRule}
 Bạn là AI mô phỏng game nhập vai tu tiên có chứa nội dung 18+. Nhiệm vụ của bạn là viết một câu chuyện tu tiên/tiên hiệp hấp dẫn, kịch tính, đồng thời tuân thủ nghiêm ngặt các quy tắc về nội dung 18+ dưới đây.
@@ -180,6 +207,7 @@ ${nsfwRules}
                 : `
 ${memoryAndConsistencyRule}
 ${coreRules}
+${choiceGenerationRule}
 ${inventoryRule}
 ${familyRule}
 Bạn là AI mô phỏng game nhập vai tu tiên. Nhiệm vụ của bạn là viết tiếp câu chuyện theo phong cách "Show, don’t tell", tập trung vào phiêu lưu, kịch tính và tương tác nhân vật. Sử dụng ngôn ngữ sống động, giàu hình ảnh.
@@ -201,10 +229,18 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                                 affection: { type: Type.STRING, description: "Mức độ yêu thích của NPC đối với người chơi, ví dụ: Thân thiện, Trung lập, Thù địch." },
                                 status: { type: Type.STRING, description: "Tình trạng thể chất, ví dụ: Khỏe mạnh, Bị thương." },
                                 psychology: { type: Type.STRING, description: "Trạng thái tinh thần, ví dụ: Bình tĩnh, Kích động." }
-                            }
+                            },
+                            required: ['name', 'age', 'personality', 'affection', 'status', 'psychology']
                         }
                     },
-                    choices: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, successChance: { type: Type.INTEGER }, successReward: { type: Type.STRING }, failurePenalty: { type: Type.STRING } } } },
+                    choices: { 
+                        type: Type.ARRAY, 
+                        items: { 
+                            type: Type.OBJECT, 
+                            properties: { text: { type: Type.STRING }, successChance: { type: Type.INTEGER }, successReward: { type: Type.STRING }, failurePenalty: { type: Type.STRING } },
+                            required: ['text', 'successChance', 'successReward', 'failurePenalty']
+                        } 
+                    },
                     customChoiceEvaluation: {
                         type: Type.OBJECT,
                         description: "CHỈ dành cho lựa chọn tùy chỉnh của người chơi. Đánh giá tỷ lệ thành công và kết quả.",
@@ -213,7 +249,8 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                             successChance: { type: Type.INTEGER },
                             successReward: { type: Type.STRING },
                             failurePenalty: { type: Type.STRING }
-                        }
+                        },
+                        required: ['text', 'successChance', 'successReward', 'failurePenalty']
                     },
                     inventoryChanges: {
                         type: Type.OBJECT,
@@ -227,7 +264,8 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                                     properties: {
                                         name: { type: Type.STRING, description: "Tên của vật phẩm." },
                                         quantity: { type: Type.INTEGER, description: "Số lượng của vật phẩm." }
-                                    }
+                                    },
+                                    required: ['name', 'quantity']
                                 }
                             },
                             removed: {
@@ -238,7 +276,8 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                                     properties: {
                                         name: { type: Type.STRING, description: "Tên của vật phẩm." },
                                         quantity: { type: Type.INTEGER, description: "Số lượng của vật phẩm." }
-                                    }
+                                    },
+                                    required: ['name', 'quantity']
                                 }
                             }
                         }
@@ -256,13 +295,18 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                                         name: { type: Type.STRING },
                                         relationship: { type: Type.STRING, description: "Mối quan hệ, ví dụ: Phụ Thân, Mẫu Thân, Thê Tử, Đệ Đệ." },
                                         status: { type: Type.STRING, description: "Tình trạng, ví dụ: Còn sống, Đã mất." }
-                                    }
+                                    },
+                                    required: ['name', 'relationship', 'status']
                                 }
                             },
                             removed: {
                                 type: Type.ARRAY,
                                 description: "Danh sách người thân bị xóa (ví dụ: qua đời).",
-                                items: { type: Type.OBJECT, properties: { name: { type: Type.STRING } } }
+                                items: { 
+                                    type: Type.OBJECT, 
+                                    properties: { name: { type: Type.STRING } },
+                                    required: ['name']
+                                }
                             },
                             updated: {
                                 type: Type.ARRAY,
@@ -273,16 +317,19 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                                         name: { type: Type.STRING },
                                         relationship: { type: Type.STRING },
                                         status: { type: Type.STRING }
-                                    }
+                                    },
+                                    required: ['name', 'relationship', 'status']
                                 }
                             }
                         }
                     }
-                }
+                },
+                required: ['story', 'choices']
             };
 
             try {
-                 const ai = new GoogleGenAI({ apiKey: apiKey });
+                 const ai = new GoogleGenAI({ apiKey });
+                 genAI.current = ai;
                  const chatSession = ai.chats.create({
                     model: 'gemini-2.5-flash',
                     config: {
@@ -298,22 +345,20 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
             }
         }
         initializeChat();
-    }, []); // Runs once on mount
+    }, []);
     
-    // Derive encountered NPCs from history
     useEffect(() => {
         const allNpcs = new Map<string, NpcDetails>();
         history.forEach(turn => {
             if (turn.npcs) {
                 turn.npcs.forEach(npc => {
-                    allNpcs.set(npc.name, npc); // Always keep the latest version
+                    allNpcs.set(npc.name, npc);
                 });
             }
         });
         setEncounteredNpcs(Array.from(allNpcs.values()));
     }, [history]);
 
-    // Start a new adventure if there's no initial history
     useEffect(() => {
         const startAdventure = async () => {
             if (chat && !initialHistory) {
@@ -352,6 +397,7 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                     const jsonText = response.text.trim();
                     const parsedData = JSON.parse(jsonText);
                     setHistory([{ id: 1, ...parsedData, isCollapsed: false }]);
+                    generateBackgroundImage(parsedData.story);
 
                 } catch (e) {
                     console.error(e);
@@ -371,17 +417,16 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
         setLoading(true);
         setError(null);
 
-        // Update the current turn to show the selected choice and collapse previous turns
-        setHistory(prev => prev.map(turn => ({
-            ...turn,
-            selectedChoiceText: turn.id === turnId ? choiceText : turn.selectedChoiceText,
-            isCollapsed: turn.id < turnId, // Collapse all turns before the current one
-        })));
+        setHistory(prev => prev.map(turn =>
+            turn.id === turnId
+                ? { ...turn, selectedChoiceText: choiceText }
+                : turn
+        ));
 
         try {
             const prompt = isCustom
-                ? `ƯU TIÊN HÀNG ĐẦU: Hành động TÙY CHỈNH của người chơi là "${choiceText}". Đầu tiên, hãy đánh giá hành động này và điền vào đối tượng 'customChoiceEvaluation'. Sau đó, TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Mô tả chi tiết điều gì đã xảy ra. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Cuối cùng, viết tiếp bối cảnh mới và đưa ra 4 lựa chọn.`
-                : `ƯU TIÊN HÀNG ĐẦU: Hành động của người chơi là "${choiceText}". TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Hãy mô tả chi tiết và một cách hợp lý điều gì đã xảy ra ngay sau đó. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Sau khi mô tả xong kết quả, hãy viết tiếp bối cảnh mới và đưa ra 4 lựa chọn phù hợp.`;
+                ? `ƯU TIÊN HÀNG ĐÂU: Hành động TÙY CHỈNH của người chơi là "${choiceText}". Đầu tiên, hãy đánh giá hành động này và điền vào đối tượng 'customChoiceEvaluation'. Sau đó, TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Mô tả chi tiết điều gì đã xảy ra. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Cuối cùng, viết tiếp bối cảnh mới và đưa ra 4 lựa chọn.`
+                : `ƯU TIÊN HÀNG ĐÂU: Hành động của người chơi là "${choiceText}". TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Hãy mô tả chi tiết và một cách hợp lý điều gì đã xảy ra ngay sau đó. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Sau khi mô tả xong kết quả, hãy viết tiếp bối cảnh mới và đưa ra 4 lựa chọn phù hợp.`;
             
             const response = await chat.sendMessage({ message: prompt });
             const jsonText = response.text.trim();
@@ -403,7 +448,6 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                 let updatedInventory = [...prevPlayerState.inventory];
                 let updatedRelatives = [...prevPlayerState.relatives];
 
-                // Handle inventory changes
                 if (parsedData.inventoryChanges) {
                     const inventoryMap = new Map(updatedInventory.map(item => [item.name, { ...item }]));
 
@@ -435,15 +479,12 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                     updatedInventory = Array.from(inventoryMap.values());
                 }
 
-                // Handle relative changes
                 if (parsedData.relativeChanges) {
-                    // Process removals first
                     if (parsedData.relativeChanges.removed) {
                         const namesToRemove = new Set(parsedData.relativeChanges.removed.map(r => r.name));
                         updatedRelatives = updatedRelatives.filter(rel => !namesToRemove.has(rel.name));
                     }
 
-                    // Process updates
                     if (parsedData.relativeChanges.updated) {
                         parsedData.relativeChanges.updated.forEach(update => {
                             const index = updatedRelatives.findIndex(rel => rel.name === update.name);
@@ -453,7 +494,6 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                         });
                     }
                     
-                    // Process additions
                     if (parsedData.relativeChanges.added) {
                         const existingNames = new Set(updatedRelatives.map(r => r.name));
                         parsedData.relativeChanges.added.forEach(add => {
@@ -467,12 +507,13 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                 return { ...prevPlayerState, inventory: updatedInventory, relatives: updatedRelatives };
             });
 
-            // Add the new turn to the history
-            setHistory(prev => [...prev, {
-                id: prev.length + 1,
+            const newTurn = {
+                id: history.length + 1,
                 ...parsedData,
                 isCollapsed: false,
-            }]);
+            };
+            setHistory(prev => [...prev, newTurn]);
+            generateBackgroundImage(newTurn.story);
 
         } catch (e) {
             console.error(e);
@@ -561,13 +602,6 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
 
     return (
         <main className="adventure-layout">
-            <PlayerSidebar 
-                playerState={playerState}
-                onOpenCharacter={() => setIsCharacterModalOpen(true)}
-                onOpenInventory={() => setIsInventoryModalOpen(true)}
-                onOpenRelatives={() => setIsRelativesModalOpen(true)}
-                onOpenNpcLog={() => setIsNpcLogModalOpen(true)}
-            />
              {lastTurn && <ChoicesModal 
                 isOpen={isChoiceModalOpen}
                 onClose={() => setIsChoiceModalOpen(false)}
@@ -577,7 +611,10 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                 onCustomChoiceSubmit={handleCustomChoiceSubmit}
                 onChoiceClick={handleChoice}
             />}
-            <div className="adventure-screen">
+            <div 
+                className={`adventure-screen ${backgroundImageUrl ? 'has-background' : ''}`}
+                style={{ '--bg-image': `url(${backgroundImageUrl})` } as React.CSSProperties}
+            >
                 {npcTooltip.visible && npcTooltip.data && <NpcTooltip data={npcTooltip.data} position={npcTooltip.position} />}
                 <CharacterModal isOpen={isCharacterModalOpen} onClose={() => setIsCharacterModalOpen(false)} playerState={playerState} />
                 <InventoryModal isOpen={isInventoryModalOpen} onClose={() => setIsInventoryModalOpen(false)} inventory={playerState.inventory} />
@@ -601,7 +638,11 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                     <h2>CUỘC PHIÊU LƯU</h2>
                     <div className="adventure-controls">
                         {saveMessage && <span className="save-message">{saveMessage}</span>}
-                        <button className="btn btn-secondary" onClick={handleSaveGame}>Lưu Trò Chơi</button>
+                        <button className="header-btn" onClick={() => setIsCharacterModalOpen(true)}>Nhân Vật</button>
+                        <button className="header-btn" onClick={() => setIsInventoryModalOpen(true)}>Túi Đồ</button>
+                        <button className="header-btn" onClick={() => setIsRelativesModalOpen(true)}>Người Thân</button>
+                        <button className="header-btn" onClick={() => setIsNpcLogModalOpen(true)}>Nhật Ký NPC</button>
+                        <button className="btn btn-secondary" onClick={handleSaveGame}>Lưu</button>
                     </div>
                 </div>
                 <div className="story-history-container">
@@ -621,7 +662,6 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
 
                 {!loading && lastTurn && !lastTurn.selectedChoiceText ? (
                      <>
-                        {/* Desktop: Inline Panel */}
                         <div className="choices-container desktop-choices-container">
                              <ChoicesPanel
                                 lastTurn={lastTurn}
@@ -632,7 +672,6 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                             />
                         </div>
 
-                        {/* Mobile: Trigger Button */}
                         <div className="mobile-choice-trigger-container">
                              <button 
                                 className="btn btn-primary mobile-choice-trigger-btn"
