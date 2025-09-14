@@ -79,6 +79,14 @@ export const familyRule = `
 - **Xóa người thân:** Khi một người thân được xác nhận đã chết.
 - Ví dụ xóa: \`"relativeChanges": { "removed": [{"name": "Lý Lão Hán"}] }\`
 `;
+export const statsAndLevelingRule = `
+✦ QUY TẮC VỀ CHỈ SỐ & LÊN CẤP (BẮT BUỘC):
+- **XEM XÉT CHỈ SỐ:** Bạn PHẢI xem xét các chỉ số của người chơi (ATK, DEF, HP) khi mô tả các trận chiến hoặc thử thách vật lý. Một người chơi cấp cao sẽ dễ dàng vượt qua thử thách cấp thấp.
+- **THƯỞNG & PHẠT:** Khi người chơi hoàn thành một hành động có ý nghĩa (đánh bại kẻ thù, hoàn thành nhiệm vụ, khám phá quan trọng), bạn PHẢI thưởng cho họ một lượng EXP hợp lý bằng cách điền vào trường \`expGained\`. Trong các trận chiến hoặc sự kiện nguy hiểm, bạn có thể gây sát thương cho người chơi (\`damageTaken\`), hồi phục cho họ (\`hpRestored\`), hoặc khiến họ tiêu tốn/hồi phục mana (\`manaUsed\`, \`manaRestored\`).
+- **NÂNG CẤP TRONG TRUYỆN:** Nếu người chơi lên cấp, hãy mô tả cảm giác sức mạnh dâng trào, linh lực đột phá, hoặc một sự thay đổi tương tự trong cơ thể họ trong phần 'story'.
+- **LOGIC SÁT THƯƠNG:** Sát thương gây ra cho người chơi nên hợp lý với chỉ số DEF của họ. Sát thương người chơi gây ra cho kẻ thù nên phản ánh chỉ số ATK của họ.
+- **CÁI CHẾT:** Nếu HP của người chơi về 0, bạn PHẢI mô tả cái chết của họ và kết thúc câu chuyện một cách bi thảm hoặc đưa ra một lựa chọn để họ hồi sinh (ví dụ: mất vật phẩm, giảm cấp độ).
+`;
            
 export const pregnancyRule = `
 QUY TẮC #M11: LOGIC MANG THAI KHI XUẤT TINH BÊN TRONG (BẮT BUỘC)

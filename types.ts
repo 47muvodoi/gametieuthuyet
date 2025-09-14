@@ -20,6 +20,36 @@ export interface PlayerState {
   relatives: Relative[];
   difficulty: 'Dễ' | 'Thường' | 'Khó' | 'Ác Mộng' | 'Địa Ngục';
   nsfw: 'Có' | 'Không';
+  daoHieu: string;
+  age: number;
+  lifespan: number;
+  attributePoints: number;
+
+  // Cultivation stats
+  level: number;
+  exp: number;
+  expToNextLevel: number;
+  realm: string;
+  stage: string;
+  stats: {
+    maxHp: number;
+    currentHp: number;
+    maxMana: number;
+    currentMana: number;
+    atk: number;
+    def: number;
+    spd: number;
+    critRate: number;
+    critDamage: number;
+    dodge: number;
+    block: number;
+    attributes: {
+        theChat: number; // Constitution
+        ngoTinh: number; // Comprehension
+        triTue: number; // Intelligence
+        mayMan: number; // Luck
+    };
+  };
 }
 
 export interface ObjectState {
@@ -66,6 +96,12 @@ export interface StoryTurn {
         removed?: { name: string }[];
         updated?: Relative[];
     };
+    // Stat changes from AI
+    expGained?: number;
+    damageTaken?: number;
+    hpRestored?: number;
+    manaUsed?: number;
+    manaRestored?: number;
 }
 
 export interface NpcTooltipState {

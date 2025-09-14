@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WorldCreationPanel } from './WorldCreationPanel';
 import { ObjectCreationPanel } from './ObjectCreationPanel';
 import type { PlayerState, ObjectState, Relative } from '../types';
-import { PERSONALITY_OPTIONS, TALENT_OPTIONS } from '../constants';
+import { PERSONALITY_OPTIONS, TALENT_OPTIONS, CULTIVATION_DATA } from '../constants';
 
 interface CreationScreenProps {
     onContinue: (playerState: PlayerState) => void;
@@ -61,6 +61,7 @@ const RELATIONSHIP_MAP: { [key: string]: string } = {
 };
 
 export const CreationScreen = ({ onContinue, objects, setObjects, onLoadGame, saveFileExists }: CreationScreenProps) => {
+    const level1Data = CULTIVATION_DATA[0];
     const [playerState, setPlayerState] = useState<PlayerState>({
         name: '',
         personality: PERSONALITY_OPTIONS[0],
@@ -71,6 +72,35 @@ export const CreationScreen = ({ onContinue, objects, setObjects, onLoadGame, sa
         relatives: [],
         difficulty: 'Thường',
         nsfw: 'Không',
+        daoHieu: 'Phàm Nhân',
+        age: 16,
+        lifespan: 80,
+        attributePoints: 0,
+        // --- CULTIVATION STATS ---
+        level: level1Data.lv,
+        exp: 0,
+        expToNextLevel: level1Data.expRequired,
+        realm: level1Data.realm,
+        stage: level1Data.stage,
+        stats: {
+            maxHp: level1Data.hp,
+            currentHp: level1Data.hp,
+            maxMana: level1Data.mana,
+            currentMana: level1Data.mana,
+            atk: level1Data.atk,
+            def: level1Data.def,
+            spd: level1Data.spd,
+            critRate: 5,
+            critDamage: 150,
+            dodge: 5,
+            block: 5,
+            attributes: {
+                theChat: 8,
+                ngoTinh: 5,
+                triTue: 7,
+                mayMan: 6,
+            }
+        }
     });
 
     const handleContinueClick = () => {

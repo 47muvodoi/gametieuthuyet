@@ -422,6 +422,53 @@ h1 {
     background-color: var(--surface-color);
 }
 
+/* --- Player Stat Bars (Header) --- */
+.player-stats-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.stat-bar {
+    width: 120px;
+    height: 18px;
+    background-color: var(--background-color);
+    border-radius: 9px;
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    border-radius: 9px 0 0 9px;
+    transition: width 0.5s ease-in-out;
+}
+
+.hp-bar .stat-bar-fill {
+    background: linear-gradient(to right, #EF4444, #F87171);
+}
+
+.mana-bar .stat-bar-fill {
+    background: linear-gradient(to right, #3B82F6, #60A5FA);
+}
+
+.stat-bar-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    line-height: 18px;
+    letter-spacing: 0.5px;
+}
+
+
 .save-message {
     color: var(--secondary-color);
     font-size: 0.9rem;
@@ -766,7 +813,7 @@ h1 {
   transform: rotate(90deg);
 }
 
-.inventory-modal-content, .relatives-modal-content, .character-modal-content, .npc-log-modal-content {
+.inventory-modal-content, .relatives-modal-content, .npc-log-modal-content {
   padding: 1.5rem;
   overflow-y: auto;
   flex-grow: 1;
@@ -868,35 +915,73 @@ h1 {
 }
 
 /* Character Modal Content */
-.character-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
+.character-modal-content {
+    background-color: #0a0f18; /* Darker background for the sheet */
+    font-family: 'Courier New', Courier, monospace;
+    color: #E2E8F0;
     padding: 1rem;
+    overflow-y: auto;
+    flex-grow: 1;
 }
-.character-info-item {
-    background-color: var(--background-color);
-    padding: 1rem;
-    border-left: 3px solid var(--primary-color);
-    border-radius: 4px;
+
+.character-sheet {
+    white-space: pre;
+    font-size: 1rem;
+    line-height: 1.6;
 }
-.character-info-item.wide {
-    grid-column: 1 / -1; /* Span full width */
+
+.character-sheet button {
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--secondary-color);
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
 }
-.character-info-item h4 {
-    font-size: 0.9rem;
+
+.character-sheet button:hover {
+    color: #FBBF24;
+    background-color: rgba(255,255,255,0.1);
+}
+
+.character-sheet button:disabled {
     color: var(--on-surface-color);
-    opacity: 0.7;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    text-decoration: none;
+    cursor: not-allowed;
+    opacity: 0.5;
 }
-.character-info-item p {
-    font-size: 1.1rem;
-    color: var(--on-background-color);
-    font-weight: 500;
+
+.exp-bar {
+    width: 100%;
+    height: 24px;
+    background-color: var(--surface-color);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
 }
+.exp-bar-fill {
+    height: 100%;
+    background: linear-gradient(to right, #F59E0B, #FBBF24);
+    border-radius: 12px 0 0 12px;
+    transition: width 0.5s ease-in-out;
+}
+.exp-bar-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    line-height: 24px;
+}
+
 
 /* NPC Log Modal Content */
 .npc-log-grid {
@@ -1090,6 +1175,10 @@ h1 {
 
   .adventure-screen {
     padding: 1rem;
+  }
+  
+  .adventure-controls .player-stats-header {
+      display: none; /* Hide stat bars on smaller screens */
   }
 
   .adventure-controls .header-btn {

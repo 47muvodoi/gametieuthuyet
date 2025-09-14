@@ -7,8 +7,8 @@ import { NpcLogModal } from './NpcLogModal';
 import { NpcTooltip } from './NpcTooltip';
 import { StoryHistory } from './StoryHistory';
 import { ChoicesPanel } from './ChoicesPanel';
-import { SAVE_GAME_KEY } from '../constants';
-import { coreRules, inventoryRule, familyRule, formattingRules, pregnancyRule, nsfwRules, memoryAndConsistencyRule, choiceGenerationRule } from './prompts';
+import { SAVE_GAME_KEY, CULTIVATION_DATA } from '../constants';
+import { coreRules, inventoryRule, familyRule, formattingRules, pregnancyRule, nsfwRules, memoryAndConsistencyRule, choiceGenerationRule, statsAndLevelingRule } from './prompts';
 import type { PlayerState, ObjectState, StoryTurn, NpcTooltipState, NpcDetails } from '../types';
 
 const API_KEY_SESSION_STORAGE_KEY = 'gemini-api-key';
@@ -199,6 +199,7 @@ ${coreRules}
 ${choiceGenerationRule}
 ${inventoryRule}
 ${familyRule}
+${statsAndLevelingRule}
 Bạn là AI mô phỏng game nhập vai tu tiên có chứa nội dung 18+. Nhiệm vụ của bạn là viết một câu chuyện tu tiên/tiên hiệp hấp dẫn, kịch tính, đồng thời tuân thủ nghiêm ngặt các quy tắc về nội dung 18+ dưới đây.
 ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Người Vô Danh'}'`)}
 ${pregnancyRule}
@@ -210,6 +211,7 @@ ${coreRules}
 ${choiceGenerationRule}
 ${inventoryRule}
 ${familyRule}
+${statsAndLevelingRule}
 Bạn là AI mô phỏng game nhập vai tu tiên. Nhiệm vụ của bạn là viết tiếp câu chuyện theo phong cách "Show, don’t tell", tập trung vào phiêu lưu, kịch tính và tương tác nhân vật. Sử dụng ngôn ngữ sống động, giàu hình ảnh.
 ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Người Vô Danh'}'`)}
 `;
@@ -322,7 +324,12 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                                 }
                             }
                         }
-                    }
+                    },
+                    expGained: { type: Type.INTEGER, description: "Lượng EXP người chơi nhận được. Chỉ bao gồm nếu có." },
+                    damageTaken: { type: Type.INTEGER, description: "Lượng sát thương người chơi phải nhận. Chỉ bao gồm nếu có." },
+                    hpRestored: { type: Type.INTEGER, description: "Lượng HP người chơi được hồi phục. Chỉ bao gồm nếu có." },
+                    manaUsed: { type: Type.INTEGER, description: "Lượng Mana người chơi đã sử dụng. Chỉ bao gồm nếu có." },
+                    manaRestored: { type: Type.INTEGER, description: "Lượng Mana người chơi được hồi phục. Chỉ bao gồm nếu có." }
                 },
                 required: ['story', 'choices']
             };
@@ -387,6 +394,8 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                     - Tính cách: ${playerState.personality}
                     - Thiên phú: ${playerState.talent}
                     - Bảo bối: ${playerState.treasures.join(', ') || 'Không có'}
+                    - Cấp độ: ${playerState.level} (${playerState.realm} - ${playerState.stage})
+                    - Chỉ số: HP ${playerState.stats.currentHp}/${playerState.stats.maxHp}, Mana ${playerState.stats.currentMana}/${playerState.stats.maxMana}, ATK ${playerState.stats.atk}, DEF ${playerState.stats.def}, SPD ${playerState.stats.spd}
 
                     ${objectsInfo}
 
@@ -424,9 +433,11 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
         ));
 
         try {
+            const playerStatusPrompt = `Trạng thái hiện tại của người chơi: Cấp ${playerState.level} (${playerState.realm} - ${playerState.stage}), HP ${playerState.stats.currentHp}/${playerState.stats.maxHp}, Mana ${playerState.stats.currentMana}/${playerState.stats.maxMana}.`;
+
             const prompt = isCustom
-                ? `ƯU TIÊN HÀNG ĐÂU: Hành động TÙY CHỈNH của người chơi là "${choiceText}". Đầu tiên, hãy đánh giá hành động này và điền vào đối tượng 'customChoiceEvaluation'. Sau đó, TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Mô tả chi tiết điều gì đã xảy ra. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Cuối cùng, viết tiếp bối cảnh mới và đưa ra 4 lựa chọn.`
-                : `ƯU TIÊN HÀNG ĐÂU: Hành động của người chơi là "${choiceText}". TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Hãy mô tả chi tiết và một cách hợp lý điều gì đã xảy ra ngay sau đó. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Sau khi mô tả xong kết quả, hãy viết tiếp bối cảnh mới và đưa ra 4 lựa chọn phù hợp.`;
+                ? `${playerStatusPrompt} ƯU TIÊN HÀNG ĐÂU: Hành động TÙY CHỈNH của người chơi là "${choiceText}". Đầu tiên, hãy đánh giá hành động này và điền vào đối tượng 'customChoiceEvaluation'. Sau đó, TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Mô tả chi tiết điều gì đã xảy ra. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Cuối cùng, viết tiếp bối cảnh mới và đưa ra 4 lựa chọn.`
+                : `${playerStatusPrompt} ƯU TIÊN HÀNG ĐÂU: Hành động của người chơi là "${choiceText}". TOÀN BỘ câu chuyện tiếp theo phải xoay quanh kết quả trực tiếp của hành động này. Hãy mô tả chi tiết và một cách hợp lý điều gì đã xảy ra ngay sau đó. Hãy nhớ sử dụng các thẻ định dạng để viết tiếp câu chuyện. Sau khi mô tả xong kết quả, hãy viết tiếp bối cảnh mới và đưa ra 4 lựa chọn phù hợp.`;
             
             const response = await chat.sendMessage({ message: prompt });
             const jsonText = response.text.trim();
@@ -445,8 +456,9 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
             }
             
             setPlayerState(prevPlayerState => {
-                let updatedInventory = [...prevPlayerState.inventory];
-                let updatedRelatives = [...prevPlayerState.relatives];
+                let newState = JSON.parse(JSON.stringify(prevPlayerState));
+                let updatedInventory = [...newState.inventory];
+                let updatedRelatives = [...newState.relatives];
 
                 if (parsedData.inventoryChanges) {
                     const inventoryMap = new Map(updatedInventory.map(item => [item.name, { ...item }]));
@@ -503,8 +515,49 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                         });
                     }
                 }
+                
+                newState.inventory = updatedInventory;
+                newState.relatives = updatedRelatives;
+
+                // --- NEW STATS LOGIC ---
+                let { currentHp, currentMana } = newState.stats;
+                if (parsedData.damageTaken) currentHp = Math.max(0, currentHp - parsedData.damageTaken);
+                if (parsedData.hpRestored) currentHp = Math.min(newState.stats.maxHp, currentHp + parsedData.hpRestored);
+                if (parsedData.manaUsed) currentMana = Math.max(0, currentMana - parsedData.manaUsed);
+                if (parsedData.manaRestored) currentMana = Math.min(newState.stats.maxMana, currentMana + parsedData.manaRestored);
+                newState.stats = { ...newState.stats, currentHp, currentMana };
+
+                if (parsedData.expGained > 0) {
+                    let currentExp = newState.exp + parsedData.expGained;
+                    let currentLevel = newState.level;
+                    let expForNext = newState.expToNextLevel;
+
+                    while (currentLevel < CULTIVATION_DATA.length && currentExp >= expForNext) {
+                        currentExp -= expForNext;
+                        currentLevel++;
+                        const nextLevelData = CULTIVATION_DATA[currentLevel - 1];
+                        
+                        newState.level = nextLevelData.lv;
+                        newState.realm = nextLevelData.realm;
+                        newState.stage = nextLevelData.stage;
+                        newState.stats = {
+                            ...newState.stats, // Preserve all existing stats
+                            maxHp: nextLevelData.hp,
+                            currentHp: nextLevelData.hp, // Full heal on level up
+                            maxMana: nextLevelData.mana,
+                            currentMana: nextLevelData.mana, // Full mana restore
+                            atk: nextLevelData.atk,
+                            def: nextLevelData.def,
+                            spd: nextLevelData.spd,
+                        };
+                        expForNext = CULTIVATION_DATA[currentLevel - 1]?.expRequired ?? Infinity;
+                    }
+
+                    newState.exp = currentExp;
+                    newState.expToNextLevel = expForNext;
+                }
         
-                return { ...prevPlayerState, inventory: updatedInventory, relatives: updatedRelatives };
+                return newState;
             });
 
             const newTurn = {
@@ -616,7 +669,12 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                 style={{ '--bg-image': `url(${backgroundImageUrl})` } as React.CSSProperties}
             >
                 {npcTooltip.visible && npcTooltip.data && <NpcTooltip data={npcTooltip.data} position={npcTooltip.position} />}
-                <CharacterModal isOpen={isCharacterModalOpen} onClose={() => setIsCharacterModalOpen(false)} playerState={playerState} />
+                <CharacterModal 
+                    isOpen={isCharacterModalOpen} 
+                    onClose={() => setIsCharacterModalOpen(false)} 
+                    playerState={playerState} 
+                    setPlayerState={setPlayerState}
+                />
                 <InventoryModal isOpen={isInventoryModalOpen} onClose={() => setIsInventoryModalOpen(false)} inventory={playerState.inventory} />
                 <RelativesModal isOpen={isRelativesModalOpen} onClose={() => setIsRelativesModalOpen(false)} relatives={playerState.relatives} />
                 <NpcLogModal isOpen={isNpcLogModalOpen} onClose={() => setIsNpcLogModalOpen(false)} npcs={encounteredNpcs} />
@@ -638,6 +696,16 @@ ${formattingRules.replace('Nhân vật chính', `'${playerState.name || 'Ngườ
                     <h2>CUỘC PHIÊU LƯU</h2>
                     <div className="adventure-controls">
                         {saveMessage && <span className="save-message">{saveMessage}</span>}
+                        <div className="player-stats-header">
+                            <div className="stat-bar hp-bar" title={`HP: ${playerState.stats.currentHp} / ${playerState.stats.maxHp}`}>
+                                <div className="stat-bar-fill" style={{width: `${(playerState.stats.currentHp / playerState.stats.maxHp) * 100}%`}}></div>
+                                <span className="stat-bar-text">HP: {playerState.stats.currentHp}/{playerState.stats.maxHp}</span>
+                            </div>
+                            <div className="stat-bar mana-bar" title={`Mana: ${playerState.stats.currentMana} / ${playerState.stats.maxMana}`}>
+                                <div className="stat-bar-fill" style={{width: `${(playerState.stats.currentMana / playerState.stats.maxMana) * 100}%`}}></div>
+                                <span className="stat-bar-text">Mana: {playerState.stats.currentMana}/{playerState.stats.maxMana}</span>
+                            </div>
+                        </div>
                         <button className="header-btn" onClick={() => setIsCharacterModalOpen(true)}>Nhân Vật</button>
                         <button className="header-btn" onClick={() => setIsInventoryModalOpen(true)}>Túi Đồ</button>
                         <button className="header-btn" onClick={() => setIsRelativesModalOpen(true)}>Người Thân</button>
